@@ -1,0 +1,16 @@
+{
+  "name": "aa-viewer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jsdom": "^31.0.1",
+    "typescript": "^7.0.2"
+  }
+}
