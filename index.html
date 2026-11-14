@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIモデル ベンチマーク・ビューア</title>
+<style>
+  :root { --zoom: 1; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: #0e1116;
+    overflow-x: hidden;
+    color: #e6eaf2;
+    font-size: calc(14px * var(--zoom));
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(16,20,27,.97);
+    border-bottom: 1px solid #262e3d;
+    padding: 7px 10px 6px;
+  }
+  h1 { font-size: .98em; margin: 0 0 6px; }
+  .palette { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 5px; -webkit-overflow-scrolling: touch; }
+  .chip {
+    flex: 0 0 auto;
+    border: 1.5px solid #39435a; background: #1b212c; color: #c9d3e6;
+    border-radius: 999px; padding: 4px 12px; font-size: .9em; cursor: pointer;
+  }
+  .chip.on { background: #2f6df6; border-color: #2f6df6; color: #fff; font-weight: 600; }
+  .search-row { display: flex; gap: 5px; margin: 2px 0 5px; }
+  #kw {
+    flex: 1; min-width: 0;
+    padding: 7px 9px; font-size: .98em;
+    border: 1.5px solid #39435a; border-radius: 8px;
+    background: #141922; color: #e6eaf2;
+  }
+  #kw::placeholder { color: #6b7688; }
+  button.action {
+    border: 1.5px solid #39435a; background: #1b212c; color: #e6eaf2; border-radius: 8px;
+    padding: 6px 10px; font-size: .9em; cursor: pointer; white-space: nowrap;
+  }
+  button.action.primary { background: #2f6df6; border-color: #2f6df6; color: #fff; font-weight: 600; }
+  .opts { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; font-size: .87em; }
+  .opts label {
+    display: inline-flex; gap: 9px; align-items: center; cursor: pointer;
+    padding: 8px 10px; font-size: .95em; color: #aeb9cc;
+    user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .opts label:has(input:checked) { color: #fff; }
+  .opts input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 42px; height: 25px; margin: 0; flex: 0 0 auto;
+    border-radius: 999px; background: #39435a; position: relative;
+    cursor: pointer; transition: background .2s ease; outline: none;
+  }
+  .opts input[type="checkbox"]::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 19px; height: 19px; border-radius: 50%;
+    background: #c9d3e6; transition: transform .2s ease, background .2s ease;
+  }
+  .opts input[type="checkbox"]:checked { background: #2f6df6; }
+  .opts input[type="checkbox"]:checked::after { transform: translateX(17px); background: #fff; }
+  .opts select { font-size: .95em; padding: 3px; border-radius: 6px; border: 1.5px solid #39435a; background: #141922; color: #e6eaf2; }
+  .zoombox { display: inline-flex; gap: 4px; align-items: center; margin-left: auto; }
+  .zoombox button { width: 30px; height: 26px; border: 1.5px solid #39435a; background: #1b212c; color: #e6eaf2; border-radius: 6px; font-size: .95em; cursor: pointer; }
+  #count { color: #8b96a9; font-size: .82em; margin-left: 6px; }
+  main { padding: 7px 10px 30px; max-width: 900px; margin: 0 auto; }
+  .row {
+    display: flex; align-items: center; gap: 7px;
+    background: #171c24; border: 1px solid #262e3d; border-radius: 8px;
+    padding: calc(3px * var(--zoom)) calc(8px * var(--zoom));
+    margin-bottom: calc(3px * var(--zoom));
+  }
+  .row.variant { margin-left: 18px; background: #12161d; }
+  .row.anchor { border-color: #f0a13c; box-shadow: 0 0 0 2px rgba(240,161,60,.35); }
+  .row.flash { animation: flash 1.2s ease; }
+  @keyframes flash { 0% { background: #57481a; } 100% { background: #171c24; } }
+  .model-name { cursor: pointer; font-weight: 700; font-size: .95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 0 12.5em; }
+  .effort { color: #8b96a9; font-size: .8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 0 3.8em; cursor: pointer; }
+  .row.name-full .effort, #chart.all-names .effort { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+  .effort.lv-max { color: #ff7b72; font-weight: 700; }
+  .effort.lv-xhigh { color: #f0a13c; font-weight: 700; }
+  .effort.lv-high { color: #ffd166; font-weight: 600; }
+  .effort.lv-medium { color: #4ade80; font-weight: 600; }
+  .effort.lv-low { color: #58a6ff; font-weight: 600; }
+  .row.name-full .model-name, #chart.all-names .model-name { white-space: normal; overflow: visible; text-overflow: clip; word-break: break-all; }
+  .maker { color: #8b96a9; font-size: .78em; white-space: nowrap; flex: 0 0 auto; text-align: right; min-width: 4.5em; }
+  .expand { border: none; background: #232c3d; color: #9db8ee; border-radius: 6px; padding: 2px 6px; font-size: .78em; cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
+  mark { background: #ffe066; color: #1c2333; border-radius: 2px; padding: 0 1px; }
+  .bar-track {
+    cursor: pointer;
+    position: relative; height: calc(15px * var(--zoom)); flex: 1 1 auto; min-width: 60px;
+    background: #232b38; border-radius: 4px; overflow: hidden;
+  }
+  .bar { height: 100%; border-radius: 4px 0 0 4px; transition: width .3s ease; }
+  .bar-value {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    font-weight: 700; font-size: .85em; color: #e6eaf2;
+  }
+  .bar-value .diff { font-size: .86em; font-weight: 600; color: #fff; }
+  .empty { color: #8b96a9; padding: 16px 4px; }
+  @media (max-width: 560px) {
+    .model-name { flex-basis: 10.4em; }
+    .row { gap: 5px; }
+    .effort { flex-basis: 3.3em; }
+    .bar-track { min-width: 40px; }
+    .maker { min-width: 0; font-size: .7em; }
+  }
+  footer { max-width: 900px; margin: 0 auto; padding: 0 10px 26px; color: #6b7688; font-size: .78em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AIモデル ベンチマーク・ビューア</h1>
+  <div class="palette" id="palette"></div>
+  <div class="search-row">
+    <input id="kw" type="search" placeholder="キーワード（空白区切りで複数OK）例: gemini gpt" autocomplete="off">
+    <button class="action primary" id="jumpBtn">次の一致へ ⤵</button>
+    <button class="action" id="clearBtn">クリア</button>
+  </div>
+  <div class="opts">
+    <label><input type="checkbox" id="filterOn" checked> 絞り込み</label>
+    <label><input type="checkbox" id="highlightOn" checked> ハイライト</label>
+    <label><input type="checkbox" id="groupOn"> バリエーションをまとめる</label>
+    <label><input type="checkbox" id="allNames"> 名前を全部表示</label>
+    <label>並び:
+      <select id="sort">
+        <option value="intelligence">Index順</option>
+        <option value="value">コスパ順</option>
+        <option value="price">価格が安い順</option>
+        <option value="speed">速度順</option>
+      </select>
+    </label>
+    <span id="jumpInfo"></span>
+    <span class="zoombox">
+      <button id="zoomOut" title="縮小">−</button>
+      <span id="zoomLabel">100%</span>
+      <button id="zoomIn" title="拡大">＋</button>
+    </span>
+  </div>
+  <div><span id="count"></span></div>
+</header>
+<main id="chart"></main>
+<footer>
+  <div id="dataInfo"></div>
+  <p>バーをタップするとそのモデルが基準になり、全員の数値が「Index値（差分）」表示になります。もう一度タップすると解除。価格・コスパ・速度での並び替えは上の「並び」から使えます（コスパ = Index ÷ 価格 $/1M）。データの出典は Artificial Analysis で、利用には出典表示が必要です。</p>
+</footer>
+<script src="./dist/main.js"></script>
+</body>
+</html>
